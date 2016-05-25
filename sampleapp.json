@@ -764,6 +764,9 @@
 								"tar zxf yum-*.tar.gz\n",
 								"rm -rf yum-*.tar.gz\n",
                                                                 "cd /var/chef/chef-repo\n",
+								"git clone https://github.com/ravibanamigi/Devops.git\n",
+								"cp -r /var/chef/chef-repo/devops/elk_ravi /var/chef/chef-repo/cookbooks/\n",
+								"cd /var/chef/chef-repo/\n",
                                                                 "aws s3 sync s3://cookbook-repository/ /var/chef/chef-repo/cookbooks/\n",
                                                                 "chef-client -z -r recipe[elk_ravi]\n",
                                                                 "chef-client -z -c /var/chef/chef-repo/.chef/client.rb\n"
