@@ -1,0 +1,885 @@
+{
+        "AWSTemplateFormatVersion" : "2010-09-09",
+        "Description" : "Sample Prod VPC with 4 subnets across 2 Availability Zones 1-EC2",
+        "Parameters" : {
+                "VpcCIDRIpBlock" : {
+                        "Description" : "CIDR Block for the VPC",
+                        "Type" : "String",
+                        "Default" : "10.10.0.0/16",
+                        "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+                },
+                "SubnetPrivateIpBlocks" : {
+                        "Description" : "Comma-delimited list of 2 Private Subnet IP blocks",
+                        "Type" : "CommaDelimitedList",
+                        "Default" : "10.10.11.0/24,10.10.13.0/24"
+                },
+                "SubnetPublicIpBlocks" : {
+                        "Description" : "Comma-delimited list of 2 Public Subnet IP blocks",
+                        "Type" : "CommaDelimitedList",
+                        "Default" : "10.10.10.0/24,10.10.12.0/24"
+                },
+                "Environment" : {
+                        "Description" : "Environment for stack is being created",
+                        "Type" : "String",
+                        "AllowedValues" : ["DEV",
+                                "STG",
+                                "PRE-PROD",
+                                "PROD"],
+                        "Default" : "PROD"
+                },
+                "Application" : {
+                        "Description" : "Name of the application for which stack is being created",
+                        "Type" : "String",
+                        "Default" : "SampleApp",
+                        "MinLength" : "2",
+                        "MaxLength" : "15"
+                },
+                "EC2HostRootDeviceSize" : {
+                        "Description" : "Size (in GB) of root partition for EC2-Host Host",
+                        "Type" : "Number",
+                        "MinValue" : "20",
+                        "MaxValue" : "100",
+                        "Default" : "50"
+                },
+                "EC2HostInstanceType" : {
+                        "Description" : "EC2-Host EC2 instance type",
+                        "Type" : "String",
+                        "Default" : "t2.micro"
+                },
+                "EC2HostInstanceId" : {
+                        "Description" : "EC2-Host instance ID",
+                        "Type" : "String",
+                        "Default" : "ami-d0f506b0"
+                },
+                "EC2HostAccessKey" : {
+                        "Description" : "EC2-Host SSH sceret key",
+                        "Type" : "String",
+                        "Default" : "SampleApp-key",
+                        "MinLength" : "5",
+                        "MaxLength" : "255",
+                        "AllowedPattern" : "[\\x20-\\x7E]*",
+                        "ConstraintDescription" : "can contain only ASCII characters."
+                },
+                "EC2HostPrivateIP" : {
+                        "Description" : "EC2-Host Private IP",
+                        "Type" : "String",
+                        "Default" : "10.10.12.10",
+                        "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})"
+                },
+                "PublicCidrIp1" : {
+                        "Description" : " The IP address range that can be used to allow connect public instances",
+                        "Type" : "String",
+                        "MinLength" : "9",
+                        "MaxLength" : "18",
+                        "Default" : "0.0.0.0/0",
+                        "AllowedPattern" : "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+                        "ConstraintDescription" : "must be a valid IP CIDR range of the form x.x.x.x/x."
+                }
+
+        },
+
+        "Resources" : {
+                "VPC" : {
+                        "Type" : "AWS::EC2::VPC",
+                        "Properties" : {
+                                "CidrBlock" : {
+                                        "Ref" : "VpcCIDRIpBlock"
+                                },
+                                "Tags" : [{
+                                                "Key" : "Owner",
+                                                "Value" : "SampleApp Infra Ops"
+                                        }, {
+                                                "Key" : "Environment",
+                                                "Value" : {
+                                                        "Ref" : "Environment"
+                                                }
+                                        }, {
+                                                "Key" : "Stack",
+                                                "Value" : {
+                                                        "Ref" : "AWS::StackName"
+                                                }
+                                        }, {
+                                                "Key" : "Name",
+                                                "Value" : {
+                                                        "Fn::Join" : ["-",
+                                                                ["VPC", {
+                                                                                "Ref" : "Application"
+                                                                        }, {
+                                                                                "Ref" : "Environment"
+                                                                        }
+                                                                ]]
+                                                }
+                                        }
+                                ]
+                        }
+                },
+                "InternetGateway" : {
+                        "Type" : "AWS::EC2::InternetGateway",
+                        "Properties" : {
+                                "Tags" : [{
+                                                "Key" : "Owner",
+                                                "Value" : "SampleApp Infra Ops"
+                                        }, {
+                                                "Key" : "Environment",
+                                                "Value" : {
+                                                        "Ref" : "Environment"
+                                                }
+                                        }, {
+                                                "Key" : "Stack",
+                                                "Value" : {
+                                                        "Ref" : "AWS::StackName"
+                                                }
+                                        }, {
+                                                "Key" : "Name",
+                                                "Value" : {
+                                                        "Fn::Join" : ["-",
+                                                                ["IGW", {
+                                                                                "Ref" : "Application"
+                                                                        }, {
+                                                                                "Ref" : "Environment"
+                                                                        }
+                                                                ]]
+                                                }
+                                        }
+                                ]
+                        }
+                },
+                "AttachGateway" : {
+                        "Type" : "AWS::EC2::VPCGatewayAttachment",
+                        "Properties" : {
+                                "VpcId" : {
+                                        "Ref" : "VPC"
+                                },
+                                "InternetGatewayId" : {
+                                        "Ref" : "InternetGateway"
+                                }
+                        }
+                },
+                "PublicSubnet1" : {
+                        "Type" : "AWS::EC2::Subnet",
+                        "Properties" : {
+                                "VpcId" : {
+                                        "Ref" : "VPC"
+                                },
+                                "CidrBlock" : {
+                                        "Fn::Select" : ["0", {
+                                                        "Ref" : "SubnetPublicIpBlocks"
+                                                }
+                                        ]
+                                },
+                                "AvailabilityZone" : {
+                                        "Fn::Select" : ["0", {
+                                                        "Fn::GetAZs" : ""
+                                                }
+                                        ]
+                                },
+                                "Tags" : [{
+                                                "Key" : "Owner",
+                                                "Value" : "SampleApp Infra Ops"
+                                        }, {
+                                                "Key" : "Environment",
+                                                "Value" : {
+                                                        "Ref" : "Environment"
+                                                }
+                                        }, {
+                                                "Key" : "Stack",
+                                                "Value" : {
+                                                        "Ref" : "AWS::StackName"
+                                                }
+                                        }, {
+                                                "Key" : "Name",
+                                                "Value" : {
+                                                        "Fn::Join" : ["-",
+                                                                ["SUB",
+                                                                        "Pub1", {
+                                                                                "Ref" : "Application"
+                                                                        }, {
+                                                                                "Ref" : "Environment"
+                                                                        }
+                                                                ]]
+                                                }
+                                        }
+                                ]
+                        }
+                },
+                "PublicSubnet2" : {
+                        "Type" : "AWS::EC2::Subnet",
+                        "Properties" : {
+                                "VpcId" : {
+                                        "Ref" : "VPC"
+                                },
+                                "CidrBlock" : {
+                                        "Fn::Select" : ["1", {
+                                                        "Ref" : "SubnetPublicIpBlocks"
+                                                }
+                                        ]
+                                },
+                                "AvailabilityZone" : {
+                                        "Fn::Select" : ["1", {
+                                                        "Fn::GetAZs" : ""
+                                                }
+                                        ]
+                                },
+                                "Tags" : [{
+                                                "Key" : "Owner",
+                                                "Value" : "SampleApp Infra Ops"
+                                        }, {
+                                                "Key" : "Environment",
+                                                "Value" : {
+                                                        "Ref" : "Environment"
+                                                }
+                                        }, {
+                                                "Key" : "Stack",
+                                                "Value" : {
+                                                        "Ref" : "AWS::StackName"
+                                                }
+                                        }, {
+                                                "Key" : "Name",
+                                                "Value" : {
+                                                        "Fn::Join" : ["-",
+                                                                ["SUB",
+                                                                        "Pub2", {
+                                                                                "Ref" : "Application"
+                                                                        }, {
+                                                                                "Ref" : "Environment"
+                                                                        }
+                                                                ]]
+                                                }
+                                        }
+                                ]
+                        }
+                },
+                "PrivateSubnet1" : {
+                        "Type" : "AWS::EC2::Subnet",
+                        "Properties" : {
+                                "VpcId" : {
+                                        "Ref" : "VPC"
+                                },
+                                "CidrBlock" : {
+                                        "Fn::Select" : ["0", {
+                                                        "Ref" : "SubnetPrivateIpBlocks"
+                                                }
+                                        ]
+                                },
+                                "AvailabilityZone" : {
+                                        "Fn::Select" : ["0", {
+                                                        "Fn::GetAZs" : ""
+                                                }
+                                        ]
+                                },
+                                "Tags" : [{
+                                                "Key" : "Owner",
+                                                "Value" : "SampleApp Infra Ops"
+                                        }, {
+                                                "Key" : "Environment",
+                                                "Value" : {
+                                                        "Ref" : "Environment"
+                                                }
+                                        }, {
+                                                "Key" : "Stack",
+                                                "Value" : {
+                                                        "Ref" : "AWS::StackName"
+                                                }
+                                        }, {
+                                                "Key" : "Name",
+                                                "Value" : {
+                                                        "Fn::Join" : ["-",
+                                                                ["SUB",
+                                                                        "Priv1", {
+                                                                                "Ref" : "Application"
+                                                                        }, {
+                                                                                "Ref" : "Environment"
+                                                                        }
+                                                                ]]
+                                                }
+                                        }
+                                ]
+                        }
+                },
+                "PrivateSubnet2" : {
+                        "Type" : "AWS::EC2::Subnet",
+                        "Properties" : {
+                                "VpcId" : {
+                                        "Ref" : "VPC"
+                                },
+                                "CidrBlock" : {
+                                        "Fn::Select" : ["1", {
+                                                        "Ref" : "SubnetPrivateIpBlocks"
+                                                }
+                                        ]
+                                },
+                                "AvailabilityZone" : {
+                                        "Fn::Select" : ["1", {
+                                                        "Fn::GetAZs" : ""
+                                                }
+                                        ]
+                                },
+                                "Tags" : [{
+                                                "Key" : "Owner",
+                                                "Value" : "SampleApp Infra Ops"
+                                        }, {
+                                                "Key" : "Environment",
+                                                "Value" : {
+                                                        "Ref" : "Environment"
+                                                }
+                                        }, {
+                                                "Key" : "Stack",
+                                                "Value" : {
+                                                        "Ref" : "AWS::StackName"
+                                                }
+                                        }, {
+                                                "Key" : "Name",
+                                                "Value" : {
+                                                        "Fn::Join" : ["-",
+                                                                ["SUB",
+                                                                        "Priv2", {
+                                                                                "Ref" : "Application"
+                                                                        }, {
+                                                                                "Ref" : "Environment"
+                                                                        }
+                                                                ]]
+                                                }
+                                        }
+                                ]
+                        }
+                },
+                "PublicRouteTable" : {
+                        "Type" : "AWS::EC2::RouteTable",
+                        "Properties" : {
+                                "VpcId" : {
+                                        "Ref" : "VPC"
+                                },
+                                "Tags" : [{
+                                                "Key" : "Owner",
+                                                "Value" : "SampleApp Infra Ops"
+                                        }, {
+                                                "Key" : "Environment",
+                                                "Value" : {
+                                                        "Ref" : "Environment"
+                                                }
+                                        }, {
+                                                "Key" : "Stack",
+                                                "Value" : {
+                                                        "Ref" : "AWS::StackName"
+                                                }
+                                        }, {
+                                                "Key" : "Name",
+                                                "Value" : {
+                                                        "Fn::Join" : ["-",
+                                                                ["RT",
+                                                                        "Pub", {
+                                                                                "Ref" : "Application"
+                                                                        }, {
+                                                                                "Ref" : "Environment"
+                                                                        }
+                                                                ]]
+                                                }
+                                        }
+                                ]
+                        }
+                },
+                "PrivateRouteTable" : {
+                        "Type" : "AWS::EC2::RouteTable",
+                        "Properties" : {
+                                "VpcId" : {
+                                        "Ref" : "VPC"
+                                },
+                                "Tags" : [{
+                                                "Key" : "Owner",
+                                                "Value" : "SampleApp Infra Ops"
+                                        }, {
+                                                "Key" : "Environment",
+                                                "Value" : {
+                                                        "Ref" : "Environment"
+                                                }
+                                        }, {
+                                                "Key" : "Stack",
+                                                "Value" : {
+                                                        "Ref" : "AWS::StackName"
+                                                }
+                                        }, {
+                                                "Key" : "Name",
+                                                "Value" : {
+                                                        "Fn::Join" : ["-",
+                                                                ["RT",
+                                                                        "Priv", {
+                                                                                "Ref" : "Application"
+                                                                        }, {
+                                                                                "Ref" : "Environment"
+                                                                        }
+                                                                ]]
+                                                }
+                                        }
+                                ]
+                        }
+                },
+                "PublicRoute" : {
+                        "Type" : "AWS::EC2::Route",
+                        "Properties" : {
+                                "RouteTableId" : {
+                                        "Ref" : "PublicRouteTable"
+                                },
+                                "DestinationCidrBlock" : "0.0.0.0/0",
+                                "GatewayId" : {
+                                        "Ref" : "InternetGateway"
+                                }
+                        }
+                },
+                "PrivateRoute" : {
+                        "Type" : "AWS::EC2::Route",
+                        "Properties" : {
+                                "RouteTableId" : {
+                                        "Ref" : "PrivateRouteTable"
+                                },
+                                "DestinationCidrBlock" : "0.0.0.0/0",
+                                "GatewayId" : {
+                                        "Ref" : "InternetGateway"
+                                }
+                        }
+                },
+                "PublicSubnetRouteTableAssociation1" : {
+                        "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+                        "Properties" : {
+                                "SubnetId" : {
+                                        "Ref" : "PublicSubnet1"
+                                },
+                                "RouteTableId" : {
+                                        "Ref" : "PublicRouteTable"
+                                }
+                        }
+                },
+                "PublicSubnetRouteTableAssociation2" : {
+                        "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+                        "Properties" : {
+                                "SubnetId" : {
+                                        "Ref" : "PublicSubnet2"
+                                },
+                                "RouteTableId" : {
+                                        "Ref" : "PublicRouteTable"
+                                }
+                        }
+                },
+                "PrivateSubnetRouteTableAssociation1" : {
+                        "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+                        "Properties" : {
+                                "SubnetId" : {
+                                        "Ref" : "PrivateSubnet1"
+                                },
+                                "RouteTableId" : {
+                                        "Ref" : "PrivateRouteTable"
+                                }
+                        }
+                },
+                "PrivateSubnetRouteTableAssociation2" : {
+                        "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+                        "Properties" : {
+                                "SubnetId" : {
+                                        "Ref" : "PrivateSubnet2"
+                                },
+                                "RouteTableId" : {
+                                        "Ref" : "PrivateRouteTable"
+                                }
+                        }
+                },
+                "PublicSubnetAcl" : {
+                        "Type" : "AWS::EC2::NetworkAcl",
+                        "Properties" : {
+                                "VpcId" : {
+                                        "Ref" : "VPC"
+                                }
+                        }
+                },
+                "PrivateSubnetAcl" : {
+                        "Type" : "AWS::EC2::NetworkAcl",
+                        "Properties" : {
+                                "VpcId" : {
+                                        "Ref" : "VPC"
+                                }
+                        }
+                },
+                "PublicInSubnetAclEntry" : {
+                        "Type" : "AWS::EC2::NetworkAclEntry",
+                        "Properties" : {
+                                "NetworkAclId" : {
+                                        "Ref" : "PublicSubnetAcl"
+                                },
+                                "RuleNumber" : "32000",
+                                "Protocol" : "-1",
+                                "RuleAction" : "allow",
+                                "Egress" : "false",
+                                "CidrBlock" : "0.0.0.0/0",
+                                "Icmp" : {
+                                        "Code" : "-1",
+                                        "Type" : "-1"
+                                },
+                                "PortRange" : {
+                                        "From" : "1",
+                                        "To" : "65535"
+                                }
+                        }
+                },
+                "PublicOutSubnetAclEntry" : {
+                        "Type" : "AWS::EC2::NetworkAclEntry",
+                        "Properties" : {
+                                "NetworkAclId" : {
+                                        "Ref" : "PublicSubnetAcl"
+                                },
+                                "RuleNumber" : "32000",
+                                "Protocol" : "-1",
+                                "RuleAction" : "allow",
+                                "Egress" : "true",
+                                "CidrBlock" : "0.0.0.0/0",
+                                "Icmp" : {
+                                        "Code" : "-1",
+                                        "Type" : "-1"
+                                },
+                                "PortRange" : {
+                                        "From" : "1",
+                                        "To" : "65535"
+                                }
+                        }
+                },
+                "PrivateInSubnetAclEntry" : {
+                        "Type" : "AWS::EC2::NetworkAclEntry",
+                        "Properties" : {
+                                "NetworkAclId" : {
+                                        "Ref" : "PrivateSubnetAcl"
+                                },
+                                "RuleNumber" : "32000",
+                                "Protocol" : "-1",
+                                "RuleAction" : "allow",
+                                "Egress" : "false",
+                                "CidrBlock" : "0.0.0.0/0",
+                                "Icmp" : {
+                                        "Code" : "-1",
+                                        "Type" : "-1"
+                                },
+                                "PortRange" : {
+                                        "From" : "1",
+                                        "To" : "65535"
+                                }
+                        }
+                },
+                "PrivateOutSubnetAclEntry" : {
+                        "Type" : "AWS::EC2::NetworkAclEntry",
+                        "Properties" : {
+                                "NetworkAclId" : {
+                                        "Ref" : "PrivateSubnetAcl"
+                                },
+                                "RuleNumber" : "32000",
+                                "Protocol" : "-1",
+                                "RuleAction" : "allow",
+                                "Egress" : "true",
+                                "CidrBlock" : "0.0.0.0/0",
+                                "Icmp" : {
+                                        "Code" : "-1",
+                                        "Type" : "-1"
+                                },
+                                "PortRange" : {
+                                        "From" : "1",
+                                        "To" : "65535"
+                                }
+                        }
+                },
+                "PublicSubnetAclAssociation1" : {
+                        "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+                        "Properties" : {
+                                "SubnetId" : {
+                                        "Ref" : "PublicSubnet1"
+                                },
+                                "NetworkAclId" : {
+                                        "Ref" : "PublicSubnetAcl"
+                                }
+                        }
+                },
+                "PublicSubnetAclAssociation2" : {
+                        "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+                        "Properties" : {
+                                "SubnetId" : {
+                                        "Ref" : "PublicSubnet2"
+                                },
+                                "NetworkAclId" : {
+                                        "Ref" : "PublicSubnetAcl"
+                                }
+                        }
+                },
+                "PrivateSubnetAclAssociation1" : {
+                        "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+                        "Properties" : {
+                                "SubnetId" : {
+                                        "Ref" : "PrivateSubnet1"
+                                },
+                                "NetworkAclId" : {
+                                        "Ref" : "PrivateSubnetAcl"
+                                }
+                        }
+                },
+                "PrivateSubnetAclAssociation2" : {
+                        "Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+                        "Properties" : {
+                                "SubnetId" : {
+                                        "Ref" : "PrivateSubnet2"
+                                },
+                                "NetworkAclId" : {
+                                        "Ref" : "PrivateSubnetAcl"
+                                }
+                        }
+                },
+                "CFNProdRole" : {
+                        "Type" : "AWS::IAM::Role",
+                        "Properties" : {
+                                "AssumeRolePolicyDocument" : {
+                                        "Version" : "2012-10-17",
+                                        "Statement" : [{
+                                                        "Effect" : "Allow",
+                                                        "Principal" : {
+                                                                "Service" : ["ec2.amazonaws.com"]
+                                                        },
+                                                        "Action" : ["sts:AssumeRole"]
+                                                }
+                                        ]
+                                },
+                                "Path" : "/"
+                        }
+                },
+                "RolePolicies" : {
+                        "Type" : "AWS::IAM::Policy",
+                        "Properties" : {
+                                "PolicyName" : "root",
+                                "PolicyDocument" : {
+                                        "Version" : "2012-10-17",
+                                        "Statement" : [{
+                                                        "Effect" : "Allow",
+                                                        "Action" : ["s3:Get*",
+                                                                "s3:List*",
+                                                                "s3:Put*",
+                                                                "cloudformation:DescribeStackResource"],
+                                                        "Resource" : "*"
+                                                }
+                                        ]
+                                },
+                                "Roles" : [{
+                                                "Ref" : "CFNProdRole"
+                                        }
+                                ]
+                        }
+                },
+                "RootInstanceProfile" : {
+                        "Type" : "AWS::IAM::InstanceProfile",
+                        "Properties" : {
+                                "Path" : "/",
+                                "Roles" : [{
+                                                "Ref" : "CFNProdRole"
+                                        }
+                                ]
+                        }
+                },
+                "CFNProdUser" : {
+                        "Type" : "AWS::IAM::User",
+                        "Properties" : {
+                                "Path" : "/",
+                                "Policies" : [{
+                                                "PolicyName" : "CFDescribeStackResource",
+                                                "PolicyDocument" : {
+                                                        "Version" : "2012-10-17",
+                                                        "Statement" : [{
+                                                                        "Effect" : "Allow",
+                                                                        "Action" : ["cloudformation:DescribeStackResource",
+                                                                                "s3:Get*",
+                                                                                "s3:List*"],
+                                                                        "Resource" : "*"
+                                                                }
+                                                        ]
+                                                }
+                                        }
+                                ]
+                        }
+                },
+                "MyUserKeys" : {
+                        "Type" : "AWS::IAM::AccessKey",
+                        "Properties" : {
+                                "UserName" : {
+                                        "Ref" : "CFNProdUser"
+                                }
+                        }
+                },
+                "EC2Host" : {
+                        "Type" : "AWS::EC2::Instance",
+                        "DeletionPolicy" : "Retain",
+                        "Properties" : {
+                                "InstanceType" : {
+                                        "Ref" : "EC2HostInstanceType"
+                                },
+                                "ImageId" : {
+                                        "Ref" : "EC2HostInstanceId"
+                                },
+                                "SubnetId" : {
+                                        "Ref" : "PublicSubnet2"
+                                },
+                                "KeyName" : {
+                                        "Ref" : "EC2HostAccessKey"
+                                },
+                                "SourceDestCheck" : "false",
+                                "DisableApiTermination" : "true",
+                                "SecurityGroupIds" : [{
+                                                "Ref" : "EC2HostSG"
+                                        }
+                                ],
+                                "IamInstanceProfile" : {
+                                        "Ref" : "RootInstanceProfile"
+                                },
+                                "PrivateIpAddress" : {
+                                        "Ref" : "EC2HostPrivateIP"
+                                },
+                                "BlockDeviceMappings" : [{
+                                                "DeviceName" : "/dev/xvda1",
+                                                "Ebs" : {
+                                                        "VolumeSize" : {
+                                                                "Ref" : "EC2HostRootDeviceSize"
+                                                        },
+                                                        "DeleteOnTermination" : "false"
+                                                }
+                                        }
+                                ],
+                                "UserData" : {
+                                        "Fn::Base64" : {
+                                                "Fn::Join" : ["",
+                                                        ["#!/bin/bash -v\n",
+                                                                "yum update -y aws-cfn-bootstrap\n",
+                                                                "yum update \n",
+                                                                "mkdir -p /var/chef/chef-repo/.chef/\n",
+                                                                "chmod 0770 /var/chef/\n",
+                                                                "echo \"cookbook_path [ '/var/chef/chef-repo/cookbooks' ]\"  > /var/chef/chef-repo/.chef/knife.rb\n",
+                                                                "echo \"node_path [ '/var/chef/chef-repo/nodes' ]\"  >> /var/chef/chef-repo/.chef/knife.rb\n",
+                                                                "chown 0400 /var/chef/chef-repo/.chef/knife.rb\n",
+                                                                "echo \"cookbook_path [ '/var/chef/chef-repo/cookbooks' ]\"  > /var/chef/chef-repo/.chef/client.rb\n",
+                                                                "echo \"node_path [ '/var/chef/chef-repo/nodes' ]\"  >> /var/chef/chef-repo/.chef/client.rb\n",
+                                                                "chown 0400 /var/chef/chef-repo/.chef/client.rb\n",
+                                                                "mkdir -p /var/chef/chef-repo/cookbooks\n",
+                                                                "chmod 775 -R /var/chef/chef-repo/\n",
+                                                                "curl https://www.opscode.com/chef/install.sh | bash\n",
+                                                                "chef-client -z -c /var/chef/chef-repo/.chef/client.rb\n",
+								"cd /var/chef/chef-repo/cookbooks/\n",
+								"knife cookbook site download yum\n",
+								"tar zxf yum-*.tar.gz\n",
+								"rm -rf yum-*.tar.gz\n",
+                                                                "cd /var/chef/chef-repo\n",
+                                                                "aws s3 sync s3://cookbook-repository/ /var/chef/chef-repo/cookbooks/\n",
+                                                                "chef-client -z -r recipe[elk_ravi]\n",
+                                                                "chef-client -z -c /var/chef/chef-repo/.chef/client.rb\n"
+                                                                ]]
+                                        }
+                                },
+                                "Tags" : [{
+                                                "Key" : "Name",
+                                                "Value" : {
+                                                        "Fn::Join" : ["-",
+                                                                [{
+                                                                                "Ref" : "Application"
+                                                                        }, {
+                                                                                "Ref" : "Environment"
+                                                                        },
+                                                                        "EC2-Host"]]
+                                                }
+                                        }, {
+                                                "Key" : "Owner",
+                                                "Value" : "SampleApp Infra Ops"
+                                        }, {
+                                                "Key" : "Environment",
+                                                "Value" : {
+                                                        "Ref" : "Environment"
+                                                }
+                                        }, {
+                                                "Key" : "Stack",
+                                                "Value" : {
+                                                        "Ref" : "AWS::StackName"
+                                                }
+                                        }
+                                ]
+                        }
+                },
+                "EC2HostIP" : {
+                        "Type" : "AWS::EC2::EIP",
+                        "Properties" : {
+                                "Domain" : "vpc",
+                                "InstanceId" : {
+                                        "Ref" : "EC2Host"
+                                }
+                        }
+                },
+                "EC2HostSG" : {
+                        "Type" : "AWS::EC2::SecurityGroup",
+                        "Properties" : {
+                                "GroupDescription" : "EC2-Host Security Group",
+                                "VpcId" : {
+                                        "Ref" : "VPC"
+                                },
+                                "SecurityGroupIngress" : [{
+                                                "IpProtocol" : "-1",
+                                                "FromPort" : "1",
+                                                "ToPort" : "65535",
+                                                "CidrIp" : {
+                                                        "Ref" : "VpcCIDRIpBlock"
+                                                }
+                                        }, {
+                                                "IpProtocol" : "tcp",
+                                                "FromPort" : "80",
+                                                "ToPort" : "80",
+                                                "CidrIp" : {
+                                                        "Ref" : "PublicCidrIp1"
+                                                }
+                                        }, {
+                                                "IpProtocol" : "tcp",
+                                                "FromPort" : "443",
+                                                "ToPort" : "443",
+                                                "CidrIp" : {
+                                                        "Ref" : "PublicCidrIp1"
+                                                }
+                                        }, {
+                                                "IpProtocol" : "tcp",
+                                                "FromPort" : "22",
+                                                "ToPort" : "22",
+                                                "CidrIp" : {
+                                                        "Ref" : "PublicCidrIp1"
+                                                }
+                                        }
+                                ]
+                        }
+                }
+        },
+        "Outputs" : {
+                "VPC" : {
+                        "Description" : "VPC",
+                        "Value" : {
+                                "Ref" : "VPC"
+                        }
+                },
+                "PublicSubnets" : {
+                        "Description" : "Public Subnets",
+                        "Value" : {
+                                "Fn::Join" : ["",
+                                        [{
+                                                        "Ref" : "PublicSubnet1"
+                                                },
+                                                ", ", {
+                                                        "Ref" : "PublicSubnet2"
+                                                }
+                                        ]]
+                        }
+                },
+                "PrivateSubnets" : {
+                        "Description" : "Private Subnets",
+                        "Value" : {
+                                "Fn::Join" : ["",
+                                        [{
+                                                        "Ref" : "PrivateSubnet1"
+                                                },
+                                                ", ", {
+                                                        "Ref" : "PrivateSubnet2"
+                                                }
+                                        ]]
+                        }
+
+                }
+        }
+}
