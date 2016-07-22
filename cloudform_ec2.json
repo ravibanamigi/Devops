@@ -1,0 +1,120 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "AWS CloudFormation  Template ",
+
+  "Parameters" : {
+    "KeyName": {
+      "Description" : "Name of an EC2 KeyPair",
+      "Type": "AWS::EC2::KeyPair::testKeyName",
+      "ConstraintDescription" : "KeyPair"
+    },
+
+    "InstanceType" : {
+      "Description" : "pptp EC2 instance type",
+      "Type" : "String",
+      "Default" : "t2.micro",
+      "AllowedValues" : [ "t2.micro", "t2.small" ],
+      "ConstraintDescription" : " EC2 instance type."
+    },
+
+    "SSHLocation" : {
+      "Description" : "The IP address range that can be used to SSH to the EC2 instances",
+      "Type": "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default": "0.0.0.0/0",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+   }
+  },
+
+  "Mappings" : {
+    "AWSInstanceType2Arch" : {
+      "t2.micro"    : { "Arch" : "HVM64"  }
+    },
+
+    "AWSInstanceType2NATArch" : {
+      "t2.micro"    : { "Arch" : "NATHVM64"  }
+    },
+	
+    "AWSRegionArch2AMI" : {
+      "us-west-2"        : { "HVM64" : "ami-7172b611" }
+    }
+  },
+
+  "Resources" : {
+    "EC2Instance" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
+        "KeyName" : { "Ref" : "KeyName" },
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+	"UserData" : {
+                        "Fn::Base64" : {
+                           "Fn::Join" : ["",
+                              ["#!/bin/bash -v\n",
+                                 "apt-get -y update \n",
+                                 "mkdir -p /var/chef/chef-repo/.chef/\n",
+                                 "chmod 0770 /var/chef/\n",
+                                 "echo \"cookbook_path [ '/var/chef/chef-repo/cookbooks' ]\"  > /var/chef/chef-repo/.chef/knife.rb\n",
+                                 "echo \"node_path [ '/var/chef/chef-repo/nodes' ]\"  >> /var/chef/chef-repo/.chef/knife.rb\n",
+                                 "chown 0400 /var/chef/chef-repo/.chef/knife.rb\n",
+                                 "echo \"cookbook_path [ '/var/chef/chef-repo/cookbooks' ]\"  > /var/chef/chef-repo/.chef/client.rb\n",
+                                 "echo \"node_path [ '/var/chef/chef-repo/nodes' ]\"  >> /var/chef/chef-repo/.chef/client.rb\n",
+                                 "chown 0400 /var/chef/chef-repo/.chef/client.rb\n",
+                                 "mkdir -p /var/chef/chef-repo/cookbooks\n",
+                                 "chmod 775 -R /var/chef/chef-repo/\n",
+                                 "curl https://www.opscode.com/chef/install.sh | bash\n",
+                                 "chef-client -z -c /var/chef/chef-repo/.chef/client.rb\n",
+			         "cd /var/chef/chef-repo/cookbooks/\n",
+				 "knife cookbook site download yum\n",
+				 "tar zxf yum-*.tar.gz\n",
+				 "rm -rf yum-*.tar.gz\n",
+                                 "cd /var/chef/chef-repo\n",
+				 "git clone https://github.com/ravibanamigi/Devops.git\n",
+				 "cp -r /var/chef/chef-repo/devops/pptpd /var/chef/chef-repo/cookbooks/\n",
+				 "cd /var/chef/chef-repo/\n",
+                                 "chef-client -z -r recipe[pptpd]\n",
+                                 "chef-client -z -c /var/chef/chef-repo/.chef/client.rb\n"
+                               ]]
+                            }
+                        }
+      		}
+         },
+
+    "InstanceSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable SSH access via port 22",
+        "SecurityGroupIngress" : [ {
+          "IpProtocol" : "tcp",
+          "FromPort" : "22",
+          "ToPort" : "22",
+          "CidrIp" : { "Ref" : "SSHLocation"}
+        } ]
+      }
+    }
+  },
+
+  "Outputs" : {
+    "InstanceId" : {
+      "Description" : "InstanceId of the newly created EC2 instance",
+      "Value" : { "Ref" : "EC2Instance" }
+    },
+    "AZ" : {
+      "Description" : "Availability Zone of the newly created EC2 instance",
+      "Value" : { "Fn::GetAtt" : [ "EC2Instance", "AvailabilityZone" ] }
+    },
+    "PublicDNS" : {
+      "Description" : "Public DNSName of the newly created EC2 instance",
+      "Value" : { "Fn::GetAtt" : [ "EC2Instance", "PublicDnsName" ] }
+    },
+    "PublicIP" : {
+      "Description" : "Public IP address of the newly created EC2 instance",
+      "Value" : { "Fn::GetAtt" : [ "EC2Instance", "PublicIp" ] }
+    }
+  }
+}
