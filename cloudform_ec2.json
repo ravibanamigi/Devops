@@ -6,7 +6,7 @@
   "Parameters" : {
     "KeyName": {
       "Description" : "Name of an EC2 KeyPair",
-      "Type": "AWS::EC2::KeyPair::testKeyName",
+      "Type": "AWS::EC2::KeyPair::KeyName",
       "ConstraintDescription" : "KeyPair"
     },
 
@@ -39,7 +39,7 @@
     },
 	
     "AWSRegionArch2AMI" : {
-      "us-west-2"        : { "HVM64" : "ami-7172b611" }
+      "us-west-2"        : { "HVM64" : "ami-d732f0b7" }
     }
   },
 
@@ -57,6 +57,7 @@
                            "Fn::Join" : ["",
                               ["#!/bin/bash -v\n",
                                  "apt-get -y update \n",
+				 "apt-get install -y git\n",
                                  "mkdir -p /var/chef/chef-repo/.chef/\n",
                                  "chmod 0770 /var/chef/\n",
                                  "echo \"cookbook_path [ '/var/chef/chef-repo/cookbooks' ]\"  > /var/chef/chef-repo/.chef/knife.rb\n",
@@ -69,16 +70,12 @@
                                  "chmod 775 -R /var/chef/chef-repo/\n",
                                  "curl https://www.opscode.com/chef/install.sh | bash\n",
                                  "chef-client -z -c /var/chef/chef-repo/.chef/client.rb\n",
-			         "cd /var/chef/chef-repo/cookbooks/\n",
-				 "knife cookbook site download yum\n",
-				 "tar zxf yum-*.tar.gz\n",
-				 "rm -rf yum-*.tar.gz\n",
                                  "cd /var/chef/chef-repo\n",
 				 "git clone https://github.com/ravibanamigi/Devops.git\n",
-				 "cp -r /var/chef/chef-repo/devops/pptpd /var/chef/chef-repo/cookbooks/\n",
-				 "cd /var/chef/chef-repo/\n",
-                                 "chef-client -z -r recipe[pptpd]\n",
-                                 "chef-client -z -c /var/chef/chef-repo/.chef/client.rb\n"
+				 "sudo cp -r /var/chef/chef-repo/devops/pptpd /var/chef/chef-repo/cookbooks/\n",
+				 "sudo cd /var/chef/chef-repo/\n",
+                                 "sudo chef-client -z -r recipe[pptpd]\n",
+                                 "sudo chef-client -z -c /var/chef/chef-repo/.chef/client.rb\n"
                                ]]
                             }
                         }
