@@ -16,18 +16,18 @@
 # See the License for the specific language governing permissions and
 # 
 
-#package "pptpd" do
-#  action :install
+package "pptpd" do
+  action :install
+end
+#execute "downloading pptpd rpm" do
+#	command "wget http://poptop.sourceforge.net/yum/stable/rhel6/pptp-release-current.noarch.rpm"
+#	cwd "/tmp"
 #end
-execute "downloading pptpd rpm" do
-	command "wget http://poptop.sourceforge.net/yum/stable/rhel6/pptp-release-current.noarch.rpm"
-	cwd "/tmp"
-end
 
-execute "Install pptpd service" do
-	command "rpm -ivh pptp-release-current.noarch.rpm"
-	cwd "/tmp"
-end
+#execute "Install pptpd service" do
+#	command "rpm -ivh pptp-release-current.noarch.rpm"
+#	cwd "/tmp"
+#end
 
 
 template "/etc/pptpd.conf" do
